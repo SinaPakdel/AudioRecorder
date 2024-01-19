@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.View
+import kotlin.math.min
 
 class WaveformView(context: Context?, attrs: AttributeSet?) :
     View(context, attrs) {
@@ -16,7 +17,7 @@ class WaveformView(context: Context?, attrs: AttributeSet?) :
 
     private var amplitude = ArrayList<Float>()
     private var spikes = ArrayList<RectF>()
-    private val raduis = 6f
+    private val radius = 6f
     private var w = 9f
     private var d = 6f
     private var sw = 0f
@@ -31,16 +32,15 @@ class WaveformView(context: Context?, attrs: AttributeSet?) :
 
 
     fun addAmplitude(amp: Float) {
-        var norm = Math.min(amp.toInt() / 7, 400).toFloat()
-        amplitude.add(norm)
+        amplitude.add(min(amp.toInt() / 7, 400).toFloat())
 
         spikes.clear()
-        var amps = amplitude.takeLast(maxSpikes)
+        val amps = amplitude.takeLast(maxSpikes)
         for (i in amps.indices) {
-            var left = sw - i * (w + d)
-            var top = sh / 2 - amps[i] / 2
-            var right = left + w
-            var bottom = top + amps[i]
+            val left = sw - i * (w + d)
+            val top = sh / 2 - amps[i] / 2
+            val right = left + w
+            val bottom = top + amps[i]
             spikes.add(RectF(left, top, right, bottom))
 
         }
@@ -57,10 +57,6 @@ class WaveformView(context: Context?, attrs: AttributeSet?) :
 
     override fun draw(canvas: Canvas) {
         super.draw(canvas)
-
-        spikes.forEach {
-            canvas.drawRoundRect(it, raduis, raduis, paint)
-
-        }
+        spikes.forEach { canvas.drawRoundRect(it, radius, radius, paint) }
     }
 }

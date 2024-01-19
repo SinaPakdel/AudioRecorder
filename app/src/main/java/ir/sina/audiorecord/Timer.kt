@@ -27,12 +27,12 @@ class Timer(listener: OnTimerTickListener) {
     }
 
     fun pause() {
-        handler.removeCallbacks(runnable, delay)
+        handler.removeCallbacks(runnable)
 
     }
 
     fun stop() {
-        handler.removeCallbacks(runnable, delay)
+        handler.removeCallbacks(runnable)
         duration = 0L
     }
 
