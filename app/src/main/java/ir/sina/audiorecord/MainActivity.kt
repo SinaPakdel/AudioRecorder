@@ -3,12 +3,9 @@ package ir.sina.audiorecord
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
-import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.Environment
 import android.os.Handler
-import android.os.VibrationEffect
 import android.os.Vibrator
 import android.util.Log
 import android.view.View
@@ -17,59 +14,57 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import ir.sina.audiorecord.databinding.ActivityMainBinding
 import java.io.File
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 
 class MainActivity : AppCompatActivity(), Timer.OnTimerTickListener {
-    private lateinit var amplitudes: ArrayList<Float>
-    private lateinit var binding: ActivityMainBinding
-    private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
-
-
-    private var isReadGranted = false
-    private var isWriteGranted = false
-    private var isRecordAudioGranted = false
-
     companion object {
         const val REQ_CODE = 101
         const val TAG = "MainActivity"
     }
+
+    private lateinit var binding: ActivityMainBinding
+
+    private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
+    private lateinit var amplitudes: ArrayList<Float>
+
+    private var isReadGranted = false
+    private var isWriteGranted = false
+    private var isRecordAudioGranted = false
 
     private var permissionGranted = false
     private lateinit var recorder: MediaRecorder
     private var dirPath = ""
     private var fileName = ""
     private var isRecording = false
-    private var isPaues = false
+    private var isPause = false
     private lateinit var bottomSheetBehavior: BottomSheetBehavior<LinearLayout>
 
-    //    private lateinit var timer: Timer
     private val timer by lazy {
         Timer(this)
+    }
+
+    private val player by lazy {
+        AudioPlayer(applicationContext)
     }
     private val vibrator by lazy {
         getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
     }
 
-    //    private lateinit var vibrator: Vibrator
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-//        vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-
 
         permissionLauncher =
-            registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissiosn ->
-                isReadGranted = permissiosn[android.Manifest.permission.READ_EXTERNAL_STORAGE] ?: isReadGranted
-                isWriteGranted = permissiosn[android.Manifest.permission.WRITE_EXTERNAL_STORAGE] ?: isWriteGranted
-                isRecordAudioGranted = permissiosn[android.Manifest.permission.RECORD_AUDIO] ?: isRecordAudioGranted
+            registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+                isReadGranted = permissions[android.Manifest.permission.READ_EXTERNAL_STORAGE] ?: isReadGranted
+                isWriteGranted = permissions[android.Manifest.permission.WRITE_EXTERNAL_STORAGE] ?: isWriteGranted
+                isRecordAudioGranted = permissions[android.Manifest.permission.RECORD_AUDIO] ?: isRecordAudioGranted
             }
 
 
@@ -81,7 +76,7 @@ class MainActivity : AppCompatActivity(), Timer.OnTimerTickListener {
         }
         binding.btnRecord.setOnClickListener {
             when {
-                isPaues -> resumeRecording()
+                isPause -> resumeRecording()
                 isRecording -> pauseRecording()
                 else -> startRecording()
             }
@@ -89,9 +84,7 @@ class MainActivity : AppCompatActivity(), Timer.OnTimerTickListener {
         }
 
         binding.btnList.setOnClickListener {
-
             Toast.makeText(this, "List Button", Toast.LENGTH_SHORT).show()
-
         }
 
         binding.btnDone.setOnClickListener {
@@ -122,6 +115,12 @@ class MainActivity : AppCompatActivity(), Timer.OnTimerTickListener {
         binding.bottomSheetBg.setOnClickListener {
             File("$dirPath$fileName.mp3").delete()
             dismiss()
+        }
+
+        binding.playFile.setOnClickListener {
+            "$dirPath$fileName.mp3"?.let {
+                player.playFile(it)
+            }
         }
         binding.btnDelete.isClickable = false
     }
@@ -160,39 +159,25 @@ class MainActivity : AppCompatActivity(), Timer.OnTimerTickListener {
 
     private fun startRecording() {
         recorder = MediaRecorder()
-        val path = filesDir.absolutePath + "/Teamyar/Teamyar Audio/"
-        val dir = File(path)
-        if (!dir.exists()) {
-            if (!dir.mkdirs()) {
-                Log.e("MainActivity", "Error creating directory")
-                return
-            }
-        }
-
+        dirPath = "${externalCacheDir?.absolutePath}/"
+        fileName = SimpleDateFormat("yyyy.MM.DD_hh.mm.ss").format(Date())
         recorder.apply {
             setAudioSource(MediaRecorder.AudioSource.MIC)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setOutputFile("$dirPath$fileName.wav")
+            setOutputFile("$dirPath$fileName.mp3")
             try {
                 prepare()
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error preparing MediaRecorder: ${e.message}")
                 return
             }
-
-            try {
-                start()
-            } catch (e: Exception) {
-                Log.e("MainActivity", "Error starting MediaRecorder: ${e.message}")
-                return
-            }
-
+            start()
 
         }
         binding.btnRecord.setImageResource(R.drawable.ic_pause)
         isRecording = true
-        isPaues = false
+        isPause = false
         timer.start()
 
         binding.btnDelete.isClickable = true
@@ -204,7 +189,7 @@ class MainActivity : AppCompatActivity(), Timer.OnTimerTickListener {
 
     private fun pauseRecording() {
         recorder.pause()
-        isPaues = true
+        isPause = true
         binding.btnRecord.setImageResource(R.drawable.ic_record)
         timer.pause()
     }
@@ -215,7 +200,7 @@ class MainActivity : AppCompatActivity(), Timer.OnTimerTickListener {
             stop()
             release()
         }
-        isPaues = false
+        isPause = false
         isRecording = false
 
         with(binding) {
@@ -233,7 +218,7 @@ class MainActivity : AppCompatActivity(), Timer.OnTimerTickListener {
 
     private fun resumeRecording() {
         recorder.resume()
-        isPaues = false
+        isPause = false
         binding.btnRecord.setImageResource(R.drawable.ic_pause)
         timer.start()
         binding.btnDelete.isClickable = true
@@ -242,7 +227,6 @@ class MainActivity : AppCompatActivity(), Timer.OnTimerTickListener {
     }
 
     override fun onTimerTick(duration: String) {
-
         binding.tvTimer.text = duration
         binding.waves.addAmplitude(recorder.maxAmplitude.toFloat())
     }
@@ -265,15 +249,11 @@ class MainActivity : AppCompatActivity(), Timer.OnTimerTickListener {
             android.Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
 
-
-        var permissionsRequest: MutableList<String> = ArrayList()
-
+        val permissionsRequest: MutableList<String> = ArrayList()
         if (!isReadGranted) permissionsRequest.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
         if (!isWriteGranted) permissionsRequest.add(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
         if (!isRecordAudioGranted) permissionsRequest.add(android.Manifest.permission.RECORD_AUDIO)
+        if (permissionsRequest.isNotEmpty()) permissionLauncher.launch(permissionsRequest.toTypedArray())
 
-        if (permissionsRequest.isNotEmpty()) {
-            permissionLauncher.launch(permissionsRequest.toTypedArray())
-        }
     }
 }
